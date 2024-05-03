@@ -98,7 +98,12 @@ class SetupConfigurator
             File file = m_filesystem->open(CONFIG_FOLDER CONFIG_FILE, "r");
             int sz = file.size() * 1.33;
             int docSize = max(sz, 2048);
+#ifdef ARDUINO_JSON_6
             DynamicJsonDocument doc((size_t)docSize);
+#else
+            JsonDocument doc;
+#endif
+
             if (file) {
                 // If file is present, load actual configuration
                 DeserializationError error = deserializeJson(doc, file);
@@ -118,9 +123,16 @@ class SetupConfigurator
             if (doc.containsKey(label))
                 return;
 
+#ifdef ARDUINO_JSON_6
             JsonObject obj = doc.createNestedObject(label);
             obj["selected"] = array[0];     // first element selected as default
             JsonArray arr = obj.createNestedArray("values");
+#else
+            JsonObject obj = doc[label].to<JsonObject>();
+            obj["selected"] = array[0];     // first element selected as default
+            JsonArray arr = obj["values"].to<JsonArray>();
+#endif
+
             for (unsigned int i=0; i<size; i++) {
                 arr.add(array[i]);
             }
@@ -160,7 +172,11 @@ class SetupConfigurator
             File file = m_filesystem->open(CONFIG_FOLDER CONFIG_FILE, "r");
             int sz = file.size() * 1.33;
             int docSize = max(sz, 2048);
+#ifdef ARDUINO_JSON_6
             DynamicJsonDocument doc((size_t)docSize);
+#else
+            JsonDocument doc;
+#endif
             if (file) {
                 // If file is present, load actual configuration
                 DeserializationError error = deserializeJson(doc, file);
@@ -190,7 +206,11 @@ class SetupConfigurator
 
             // if min, max, step != from default, treat this as object in order to set other properties
             if (d_min != MIN_F || d_max != MAX_F || step != 1.0) {
+#ifdef ARDUINO_JSON_6
                 JsonObject obj = doc.createNestedObject(key);
+#else
+                JsonObject obj = doc[key].to<JsonObject>();
+#endif
                 obj["value"] = static_cast<T>(val);
                 obj["min"] = d_min;
                 obj["max"] = d_max;
@@ -212,7 +232,11 @@ class SetupConfigurator
         template <typename T>
         bool getOptionValue(const char *label, T &var) {
             File file = m_filesystem->open(CONFIG_FOLDER CONFIG_FILE, "r");
+#ifdef ARDUINO_JSON_6
             DynamicJsonDocument doc(file.size() * 1.33);
+#else
+            JsonDocument doc;
+#endif
             if (file) {
                 DeserializationError error = deserializeJson(doc, file);
                 if (error) {
@@ -237,7 +261,11 @@ class SetupConfigurator
         template <typename T>
         bool saveOptionValue(const char *label, T val) {
             File file = m_filesystem->open(CONFIG_FOLDER CONFIG_FILE, "w");
+#ifdef ARDUINO_JSON_6
             DynamicJsonDocument doc(file.size() * 1.33);
+#else
+            JsonDocument doc;
+#endif
 
             if (file) {
                 DeserializationError error = deserializeJson(doc, file);

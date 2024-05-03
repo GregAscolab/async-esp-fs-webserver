@@ -3,7 +3,7 @@
 bool AsyncFsWebServer::init(AwsEventHandler wsHandle) {
     File file = m_filesystem->open(CONFIG_FOLDER, "r");
     if (!file) {
-        log_error("Failed to open /setup directory. Create new folder\n");
+        log_error("Failed to open %s directory. Create new folder\n", CONFIG_FOLDER);
         m_filesystem->mkdir(CONFIG_FOLDER);
         ESP.restart();
     }
@@ -276,12 +276,22 @@ void AsyncFsWebServer::handleScanNetworks(AsyncWebServerRequest *request) {
     #endif
 
     log_info(" done!\nNumber of networks: %d", res);
+#ifdef ARDUINO_JSON_6
     DynamicJsonDocument doc(res*96);
+#else
+    JsonDocument doc;
+#endif
     JsonArray array = doc.to<JsonArray>();
 
     if (res > 0) {
         for (int i = 0; i < res; ++i) {
+
+#ifdef ARDUINO_JSON_6
             JsonObject obj = array.createNestedObject();
+#else
+            JsonObject obj = array.add<JsonObject>();
+#endif
+
             obj["strength"] = WiFi.RSSI(i);
             obj["ssid"] = WiFi.SSID(i);
             #if defined(ESP8266)
@@ -308,6 +318,7 @@ bool AsyncFsWebServer::createDirFromPath(const String& path) {
 
         // Check if its a valid dir
         if (dir.indexOf(".") == -1) {
+            log_debug("Check dir:%s", dir.c_str());
             if (!m_filesystem->exists(dir)) {
                 if (m_filesystem->mkdir(dir)) {
                     log_info("Folder %s created", dir.c_str());
@@ -326,15 +337,23 @@ bool AsyncFsWebServer::createDirFromPath(const String& path) {
 void AsyncFsWebServer::handleUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
 
     // DebugPrintln("Handle upload POST");
+    log_debug("handleUpload:(%s,%i,%i,%i)", filename.c_str(), index, len, (int)final);
     if (!index) {
         // Increase task WDT timeout
         setTaskWdt(m_timeout);
 
         // Create folder if necessary (up to max 5 sublevels)
-        int len = filename.length();
-        char path[len+1];
-        strcpy(path, filename.c_str());
-        createDirFromPath(path);
+        // int len = filename.length();
+        // char path[len+1];
+        // strcpy(path, filename.c_str());
+        // log_debug("handleUpload:1 createDirFromPath(%s)", path);
+        // createDirFromPath(path);
+        if( !filename.startsWith("/") ) {
+            filename = "/" + filename;
+        }
+        log_debug("handleUpload:2 createDirFromPath(%s)", filename.c_str());
+        createDirFromPath(filename);
+
 
         // open the file on first call and store the file handle in the request object
         request->_tempFile = m_filesystem->open(filename, "w");
@@ -589,7 +608,11 @@ IPAddress AsyncFsWebServer::startWiFi(uint32_t timeout, CallbackF fn ) {
     File file = m_filesystem->open(CONFIG_FOLDER CONFIG_FILE, "r");
     int sz = file.size() * 1.33;
     int docSize = max(sz, 2048);
+#ifdef ARDUINO_JSON_6
     DynamicJsonDocument doc((size_t)docSize);
+#else
+    JsonDocument doc;
+#endif
     if (file) {
         // If file is present, load actual configuration
         DeserializationError error = deserializeJson(doc, file);
@@ -707,12 +730,20 @@ void AsyncFsWebServer::handleFileList(AsyncWebServerRequest *request)
     }
 
     File root = m_filesystem->open(path, "r");
+#ifdef ARDUINO_JSON_6
     DynamicJsonDocument doc(1024);
+#else
+    JsonDocument doc;
+#endif
     JsonArray array = doc.to<JsonArray>();
     if (root.isDirectory()) {
         File file = root.openNextFile();
         while (file) {
+#ifdef ARDUINO_JSON_6
             JsonObject obj = array.createNestedObject();
+#else
+            JsonObject obj = array.add<JsonObject>();
+#endif
             String filename = file.name();
             if (filename.lastIndexOf("/") > -1) {
                 filename.remove(0, filename.lastIndexOf("/") + 1);
